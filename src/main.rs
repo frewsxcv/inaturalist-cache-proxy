@@ -15,6 +15,8 @@ async fn hello(request: Request<hyper::body::Incoming>) -> Result<Response<Full<
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    env_logger::init();
+
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
@@ -36,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .serve_connection(io, service_fn(hello))
                 .await
             {
-                println!("Error serving connection: {:?}", err);
+                log::error!("Error serving connection: {:?}", err);
             }
         });
     }
