@@ -38,6 +38,7 @@ impl CachedResponse {
     fn to_hyper_response(&self) -> HttpResponse {
         Response::builder()
             .status(self.status)
+            .header("Access-Control-Allow-Origin", "*")
             .body(Full::new(self.body.clone()))
             .unwrap()
     }
@@ -89,6 +90,7 @@ async fn make_request(
         bytes.clone(),
         Response::builder()
             .status(status)
+            .header("Access-Control-Allow-Origin", "*")
             .body(Full::new(bytes))
             .unwrap(),
     )
