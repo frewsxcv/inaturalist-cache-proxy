@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
-env_logger = "0.10"
 reqwest = "*"
 hyper = { version = "1.0.0-rc.4", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
