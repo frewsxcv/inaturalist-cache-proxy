@@ -1,33 +1,97 @@
-use std::convert::Infallible;
-use std::net::SocketAddr;
-
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::net::SocketAddr;
+use std::sync::Mutex;
 use tokio::net::TcpListener;
 
 const PORT: u16 = 8080;
 
-async fn hello(
-    request: Request<hyper::body::Incoming>,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+#[derive(Debug, Hash, Eq, PartialEq)]
+struct CachedRequest {
+    method: reqwest::Method,
+    path: String,
+}
+
+impl CachedRequest {
+    fn from_http_request(request: &HttpRequest) -> CachedRequest {
+        CachedRequest {
+            method: request.method().clone(),
+            path: request.uri().path_and_query().unwrap().as_str().to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+struct CachedResponse {
+    status: reqwest::StatusCode,
+    body: Bytes,
+}
+
+impl CachedResponse {
+    fn to_hyper_response(&self) -> HttpResponse {
+        Response::builder()
+            .status(self.status)
+            .body(Full::new(self.body.clone()))
+            .unwrap()
+    }
+}
+
+type HttpRequest = Request<hyper::body::Incoming>;
+
+type HttpResponseBytes = Full<Bytes>;
+type HttpResponse = Response<HttpResponseBytes>;
+
+static RESPONSE_CACHE: Lazy<Mutex<HashMap<CachedRequest, CachedResponse>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+async fn hello(request: HttpRequest) -> Result<HttpResponse, Infallible> {
     let client = reqwest::Client::new();
+    let inaturalist_request_data = CachedRequest::from_http_request(&request);
+    if let Some(n) = RESPONSE_CACHE
+        .lock()
+        .unwrap()
+        .get(&inaturalist_request_data)
+    {
+        return Ok(n.to_hyper_response());
+    }
     let request = build_request(
         &client,
         request.method().clone(),
         request.uri().path_and_query().unwrap().as_str(),
+    )
+    .unwrap();
+    let (bytes, response) = make_request(&client, request).await;
+    RESPONSE_CACHE.lock().unwrap().insert(
+        inaturalist_request_data,
+        CachedResponse {
+            status: response.status(),
+            body: bytes,
+        },
     );
-    let response = client.execute(request.unwrap()).await.unwrap();
+    Ok(response)
+}
+
+async fn make_request(
+    client: &reqwest::Client,
+    request: reqwest::Request,
+) -> (Bytes, HttpResponse) {
+    let response = client.execute(request).await.unwrap();
     let status = response.status();
     let bytes = response.bytes().await.unwrap();
-    let response = Response::builder()
-        .status(status)
-        .body(Full::new(bytes))
-        .unwrap();
-    Ok(response)
+    (
+        bytes.clone(),
+        Response::builder()
+            .status(status)
+            .body(Full::new(bytes))
+            .unwrap(),
+    )
 }
 
 #[tokio::main]
