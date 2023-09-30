@@ -2,9 +2,14 @@
 name = "rust-app-engine"
 version = "0.1.0"
 description = "App Engine Rust boilerplate"
-authors = ["Denis Kolodin <deniskolodin@gmail.com>"]
+authors = ["Corey Farwell <coreyf@rwell.org>"]
+edition = "2021"
 
 [dependencies]
-log = "0.3.6"
-env_logger = "0.3.3"
-rustful = "0.8"
+log = "0.4"
+env_logger = "0.10"
+reqwest = "*"
+hyper = { version = "1.0.0-rc.4", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
+http-body-util = "0.1.0-rc.3"
+hyper-util = { git = "https://github.com/hyperium/hyper-util.git" } 
