@@ -9,7 +9,14 @@ use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 
+const PORT: u16 = 8080;
+
 async fn hello(request: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+    let client = reqwest::Client::new();
+    let request = build_request(&client, "GET", "observations?fields=(species_guess:!t,user:(login:!t))");
+    log::info!("Request: {:?}", &request);
+    let response = client.execute(request.unwrap()).await.unwrap().text().await.unwrap();
+    log::info!("Response: {:?}", response);
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
 }
 
@@ -17,7 +24,7 @@ async fn hello(request: Request<hyper::body::Incoming>) -> Result<Response<Full<
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     env_logger::init();
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr = SocketAddr::from(([0, 0, 0, 0], PORT));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
@@ -45,12 +52,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 fn build_url(path: &str) -> String {
-    format!("https://inaturalist.org/api/#{path}")
+    format!("https://api.inaturalist.org/v2/{path}")
 }
 
-fn build_request(method: &str, path: &str) -> Result<reqwest::Request, reqwest::Error> {
+fn build_request(client: &reqwest::Client, method: &str, path: &str) -> Result<reqwest::Request, reqwest::Error> {
     // TODO: don't hardcode the method constant below
-    reqwest::Client::new()
+    client
         .request(reqwest::Method::GET, build_url(path))
+        .header("Content-Type", "application/json")
         .build()
 }
