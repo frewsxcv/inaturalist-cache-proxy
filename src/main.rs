@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 fn build_url(path: &str) -> String {
-    format!("https://api.inaturalist.org/v2{path}")
+    format!("https://api.inaturalist.org/v1{path}")
 }
 
 fn build_request(
