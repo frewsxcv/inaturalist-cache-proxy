@@ -20,19 +20,14 @@ async fn hello(
         request.method().clone(),
         request.uri().path_and_query().unwrap().as_str(),
     );
-    log::info!("Request: {:?}", &request);
-    let response = client
-        .execute(request.unwrap())
-        .await
+    let response = client.execute(request.unwrap()).await.unwrap();
+    let status = response.status();
+    let bytes = response.bytes().await.unwrap();
+    let response = Response::builder()
+        .status(status)
+        .body(Full::new(bytes))
         .unwrap();
-    let status = response
-        .status();
-    let text = response
-        .text()
-        .await
-        .unwrap();
-    log::info!("Status: {:?}, Response: {:?}", status, text);
-    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+    Ok(response)
 }
 
 #[tokio::main]
