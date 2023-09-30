@@ -17,18 +17,21 @@ async fn hello(
     let client = reqwest::Client::new();
     let request = build_request(
         &client,
-        "GET",
-        "observations?fields=(species_guess:!t,user:(login:!t))",
+        request.method().clone(),
+        request.uri().path_and_query().unwrap().as_str(),
     );
     log::info!("Request: {:?}", &request);
     let response = client
         .execute(request.unwrap())
         .await
-        .unwrap()
+        .unwrap();
+    let status = response
+        .status();
+    let text = response
         .text()
         .await
         .unwrap();
-    log::info!("Response: {:?}", response);
+    log::info!("Status: {:?}, Response: {:?}", status, text);
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
 }
 
@@ -64,17 +67,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 fn build_url(path: &str) -> String {
-    format!("https://api.inaturalist.org/v2/{path}")
+    format!("https://api.inaturalist.org/v2{path}")
 }
 
 fn build_request(
     client: &reqwest::Client,
-    method: &str,
+    method: reqwest::Method,
     path: &str,
 ) -> Result<reqwest::Request, reqwest::Error> {
-    // TODO: don't hardcode the method constant below
     client
-        .request(reqwest::Method::GET, build_url(path))
+        .request(method, build_url(path))
         .header("Content-Type", "application/json")
         .build()
 }
