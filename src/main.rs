@@ -11,11 +11,23 @@ use tokio::net::TcpListener;
 
 const PORT: u16 = 8080;
 
-async fn hello(request: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+async fn hello(
+    request: Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, Infallible> {
     let client = reqwest::Client::new();
-    let request = build_request(&client, "GET", "observations?fields=(species_guess:!t,user:(login:!t))");
+    let request = build_request(
+        &client,
+        "GET",
+        "observations?fields=(species_guess:!t,user:(login:!t))",
+    );
     log::info!("Request: {:?}", &request);
-    let response = client.execute(request.unwrap()).await.unwrap().text().await.unwrap();
+    let response = client
+        .execute(request.unwrap())
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
     log::info!("Response: {:?}", response);
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
 }
@@ -55,7 +67,11 @@ fn build_url(path: &str) -> String {
     format!("https://api.inaturalist.org/v2/{path}")
 }
 
-fn build_request(client: &reqwest::Client, method: &str, path: &str) -> Result<reqwest::Request, reqwest::Error> {
+fn build_request(
+    client: &reqwest::Client,
+    method: &str,
+    path: &str,
+) -> Result<reqwest::Request, reqwest::Error> {
     // TODO: don't hardcode the method constant below
     client
         .request(reqwest::Method::GET, build_url(path))
