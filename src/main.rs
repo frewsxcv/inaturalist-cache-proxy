@@ -84,13 +84,15 @@ async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpec
     )
     .unwrap();
     let (bytes, response) = make_request(&client, request).await;
-    RESPONSE_CACHE.lock().unwrap().insert(
-        inaturalist_request_data,
-        CachedResponse {
-            status: response.status(),
-            body: bytes,
-        },
-    );
+    if response.status().is_success() {
+        RESPONSE_CACHE.lock().unwrap().insert(
+            inaturalist_request_data,
+            CachedResponse {
+                status: response.status(),
+                body: bytes,
+            },
+        );
+    }
     Ok(response)
 }
 
