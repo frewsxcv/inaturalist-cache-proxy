@@ -30,7 +30,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            println!("HI");
             // Finally, we bind the incoming connection to our `hello` service
             if let Err(err) = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
