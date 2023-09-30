@@ -67,6 +67,20 @@ type HttpResponse = Response<HttpResponseBytes>;
 static RESPONSE_CACHE: Lazy<Mutex<HashMap<CachedRequest, CachedResponse>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+static INATURALIST_RATE_LIMIT_AMOUNT: Lazy<governor::Quota> = Lazy::new(|| {
+    governor::Quota::with_period(std::time::Duration::from_secs(2)).unwrap()
+});
+
+static INATURALIST_RATE_LIMITER: Lazy<
+    governor::RateLimiter<
+        governor::state::direct::NotKeyed,
+        governor::state::InMemoryState,
+        governor::clock::DefaultClock,
+    >,
+> = Lazy::new(|| {
+    governor::RateLimiter::direct(*INATURALIST_RATE_LIMIT_AMOUNT)
+});
+
 async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpecified> {
     let client = reqwest::Client::new();
     let inaturalist_request_data = CachedRequest::from_http_request(&request)?;
@@ -100,6 +114,7 @@ async fn make_request(
     client: &reqwest::Client,
     request: reqwest::Request,
 ) -> (Bytes, HttpResponse) {
+    INATURALIST_RATE_LIMITER.until_ready().await;
     let response = client.execute(request).await.unwrap();
     let status = response.status();
     let bytes = response.bytes().await.unwrap();
