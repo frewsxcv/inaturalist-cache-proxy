@@ -6,7 +6,6 @@ use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Mutex;
 use tokio::net::TcpListener;
@@ -19,12 +18,28 @@ struct CachedRequest {
     path: String,
 }
 
+/// Error that indicates the path and query weren't specified
+#[derive(Debug)]
+struct PathAndQueryNotSpecified;
+
+impl std::fmt::Display for PathAndQueryNotSpecified {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "URI path and query not specified")
+    }
+}
+
+impl std::error::Error for PathAndQueryNotSpecified {}
+
 impl CachedRequest {
-    fn from_http_request(request: &HttpRequest) -> CachedRequest {
-        CachedRequest {
+    fn from_http_request(request: &HttpRequest) -> Result<CachedRequest, PathAndQueryNotSpecified> {
+        let path_and_query = request
+            .uri()
+            .path_and_query()
+            .ok_or_else(|| PathAndQueryNotSpecified)?;
+        Ok(CachedRequest {
             method: request.method().clone(),
-            path: request.uri().path_and_query().unwrap().as_str().to_string(),
-        }
+            path: path_and_query.as_str().to_string(),
+        })
     }
 }
 
@@ -52,9 +67,9 @@ type HttpResponse = Response<HttpResponseBytes>;
 static RESPONSE_CACHE: Lazy<Mutex<HashMap<CachedRequest, CachedResponse>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-async fn hello(request: HttpRequest) -> Result<HttpResponse, Infallible> {
+async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpecified> {
     let client = reqwest::Client::new();
-    let inaturalist_request_data = CachedRequest::from_http_request(&request);
+    let inaturalist_request_data = CachedRequest::from_http_request(&request)?;
     if let Some(n) = RESPONSE_CACHE
         .lock()
         .unwrap()
