@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 
 const PORT: u16 = 8080;
@@ -35,7 +36,7 @@ impl CachedRequest {
         let path_and_query = request
             .uri()
             .path_and_query()
-            .ok_or_else(|| PathAndQueryNotSpecified)?;
+            .ok_or(PathAndQueryNotSpecified)?;
         Ok(CachedRequest {
             method: request.method().clone(),
             path: path_and_query.as_str().to_string(),
@@ -45,6 +46,8 @@ impl CachedRequest {
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 struct CachedResponse {
+    /// Timestamp for when the cache entry expires
+    expires_on: Instant,
     status: reqwest::StatusCode,
     body: Bytes,
 }
@@ -67,9 +70,8 @@ type HttpResponse = Response<HttpResponseBytes>;
 static RESPONSE_CACHE: Lazy<Mutex<HashMap<CachedRequest, CachedResponse>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-static INATURALIST_RATE_LIMIT_AMOUNT: Lazy<governor::Quota> = Lazy::new(|| {
-    governor::Quota::with_period(std::time::Duration::from_secs(2)).unwrap()
-});
+static INATURALIST_RATE_LIMIT_AMOUNT: Lazy<governor::Quota> =
+    Lazy::new(|| governor::Quota::with_period(std::time::Duration::from_secs(2)).unwrap());
 
 static INATURALIST_RATE_LIMITER: Lazy<
     governor::RateLimiter<
@@ -77,19 +79,30 @@ static INATURALIST_RATE_LIMITER: Lazy<
         governor::state::InMemoryState,
         governor::clock::DefaultClock,
     >,
-> = Lazy::new(|| {
-    governor::RateLimiter::direct(*INATURALIST_RATE_LIMIT_AMOUNT)
-});
+> = Lazy::new(|| governor::RateLimiter::direct(*INATURALIST_RATE_LIMIT_AMOUNT));
+
+// Length in seconds to cache a response for
+static CACHE_TTL_REQUEST_HEADER: &str = "X-CACHE-TTL";
 
 async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpecified> {
     let client = reqwest::Client::new();
+    let cache_ttl_duration = Duration::from_secs(
+        request
+            .headers()
+            .get(CACHE_TTL_REQUEST_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(60 * 60 * 24 * 7),
+    ); // Default to 7 days
     let inaturalist_request_data = CachedRequest::from_http_request(&request)?;
     if let Some(n) = RESPONSE_CACHE
         .lock()
         .unwrap()
         .get(&inaturalist_request_data)
     {
-        return Ok(n.to_hyper_response());
+        if Instant::now() < n.expires_on {
+            return Ok(n.to_hyper_response());
+        }
     }
     let request = build_request(
         &client,
@@ -102,6 +115,7 @@ async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpec
         RESPONSE_CACHE.lock().unwrap().insert(
             inaturalist_request_data,
             CachedResponse {
+                expires_on: (Instant::now() + cache_ttl_duration),
                 status: response.status(),
                 body: bytes,
             },
