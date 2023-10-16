@@ -1,5 +1,8 @@
 runtime: custom
 env: flex
+automatic_scaling:
+    max_num_instances: 2
+    min_num_instances: 1
 # Warning! skip_files doesn't work for custom runtime
 skip_files:
     - ^target.*$
