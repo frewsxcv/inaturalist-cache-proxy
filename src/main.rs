@@ -85,6 +85,16 @@ static INATURALIST_RATE_LIMITER: Lazy<
 static CACHE_TTL_REQUEST_HEADER: &str = "X-CACHE-TTL";
 
 async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpecified> {
+    // If is option request respond with Access-Control-Allow-Headers
+    if request.method() == hyper::Method::OPTIONS {
+        return Ok(Response::builder()
+            .status(200)
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Access-Control-Allow-Headers", CACHE_TTL_REQUEST_HEADER)
+            .body(Full::new(Bytes::new()))
+            .unwrap());
+    }
+
     let client = reqwest::Client::new();
     let cache_ttl_duration = Duration::from_secs(
         request
