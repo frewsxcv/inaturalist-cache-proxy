@@ -85,6 +85,7 @@ static INATURALIST_RATE_LIMITER: Lazy<
 static CACHE_TTL_REQUEST_HEADER: &str = "X-CACHE-TTL";
 
 async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpecified> {
+    println!("Received request: {:?}", request);
     // If is option request respond with Access-Control-Allow-Headers
     if request.method() == hyper::Method::OPTIONS {
         return Ok(Response::builder()
