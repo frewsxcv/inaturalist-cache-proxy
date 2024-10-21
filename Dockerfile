@@ -5,5 +5,5 @@ EXPOSE 8080
 WORKDIR /opt/myapp
 COPY . .
 
-RUN cargo build --release
-CMD cargo run --release
+RUN cargo build --release --color=never
+CMD cargo run --release --color=never
