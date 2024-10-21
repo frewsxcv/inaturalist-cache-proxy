@@ -1,4 +1,4 @@
-FROM rust:1.72.1
+FROM rust:1.84.0
 
 EXPOSE 8080
 
