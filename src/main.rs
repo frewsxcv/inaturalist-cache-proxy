@@ -114,7 +114,10 @@ async fn hello(request: HttpRequest) -> Result<HttpResponse, PathAndQueryNotSpec
         if Instant::now() < n.expires_on {
             return Ok(n.to_hyper_response());
         } else {
-            RESPONSE_CACHE.lock().unwrap().remove(&inaturalist_request_data);
+            RESPONSE_CACHE
+                .lock()
+                .unwrap()
+                .remove(&inaturalist_request_data);
         }
     }
     let request = build_request(
